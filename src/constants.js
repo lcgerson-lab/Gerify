@@ -18,3 +18,18 @@ export const PLAYLIST_COLORS = [
   "#1a472a", "#1a2a47", "#47201a", "#2a1a47",
   "#3d2b1a", "#1a3d2b", "#2a3d1a", "#3d1a2a",
 ];
+
+export const GENRES = [
+  { id: 'g1',  name: 'Electrónica', hue: 195 },
+  { id: 'g2',  name: 'Indie',       hue: 30  },
+  { id: 'g3',  name: 'Ambient',     hue: 220 },
+  { id: 'g4',  name: 'Jazz',        hue: 50  },
+  { id: 'g5',  name: 'Latino',      hue: 18  },
+  { id: 'g6',  name: 'Folk',        hue: 140 },
+  { id: 'g7',  name: 'Hip-hop',     hue: 280 },
+  { id: 'g8',  name: 'Clásica',     hue: 8   },
+  { id: 'g9',  name: 'Lo-fi',       hue: 110 },
+  { id: 'g10', name: 'Pop',         hue: 320 },
+  { id: 'g11', name: 'Rock',        hue: 0   },
+  { id: 'g12', name: 'R&B',         hue: 350 },
+];

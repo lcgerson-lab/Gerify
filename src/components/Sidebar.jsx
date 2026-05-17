@@ -1,67 +1,62 @@
-import { useNavigate, useLocation } from 'react-router-dom';
-import GerifyLogo from './GerifyLogo';
+import Icon from './Icon';
+import Cover from './Cover';
+import { PLAYLIST_COLORS } from '../constants';
 
 const navItems = [
-  { path: "/", icon: "⊞", label: "Inicio" },
-  { path: "/search", icon: "⊙", label: "Buscar" },
-  { path: "/library", icon: "▤", label: "Biblioteca" },
+  { path: '/', icon: 'home', label: 'Inicio' },
+  { path: '/search', icon: 'search', label: 'Buscar' },
+  { path: '/library', icon: 'library', label: 'Biblioteca' },
 ];
 
-export default function Sidebar({ playlists, onPlayPlaylist }) {
-  const navigate = useNavigate();
-  const { pathname } = useLocation();
-
+export default function Sidebar({ playlists, onPlayPlaylist, pathname, navigate }) {
   return (
-    <div style={{
-      width: 240, background: "#0a0a0a", display: "flex", flexDirection: "column",
-      padding: "24px 0", borderRight: "1px solid #1a1a1a", flexShrink: 0,
-    }}>
-      <div style={{ padding: "0 24px 32px" }}>
-        <GerifyLogo />
+    <div style={{ width: 240, background: 'var(--bg-2)', display: 'flex', flexDirection: 'column', padding: '20px 0', borderRight: '1px solid var(--line)', flexShrink: 0 }}>
+      <div style={{ padding: '0 20px 28px', display: 'flex', alignItems: 'center', gap: 8 }}>
+        <Icon name="logo" size={28} />
+        <span style={{ fontFamily: "'Syne', sans-serif", fontSize: 18, fontWeight: 900, color: 'var(--green)' }}>Gerify</span>
       </div>
 
-      <nav style={{ padding: "0 12px" }}>
-        {navItems.map(item => (
-          <button key={item.path} onClick={() => navigate(item.path)} style={{
-            display: "flex", alignItems: "center", gap: 14, width: "100%",
-            padding: "10px 12px", borderRadius: 8, border: "none", cursor: "pointer",
-            background: pathname === item.path ? "#1a1a1a" : "transparent",
-            color: pathname === item.path ? "#fff" : "#8a8a8a",
-            fontSize: 14, fontFamily: "'DM Sans', sans-serif", fontWeight: 600,
-            transition: "all 0.15s", textAlign: "left",
-          }}
-            onMouseEnter={e => e.currentTarget.style.color = "#fff"}
-            onMouseLeave={e => { if (pathname !== item.path) e.currentTarget.style.color = "#8a8a8a"; }}
-          >
-            <span style={{ fontSize: 18 }}>{item.icon}</span>
-            {item.label}
-          </button>
-        ))}
+      <nav style={{ padding: '0 10px' }}>
+        {navItems.map(item => {
+          const active = pathname === item.path;
+          return (
+            <button key={item.path} onClick={() => navigate(item.path)} style={{
+              display: 'flex', alignItems: 'center', gap: 12, width: '100%',
+              padding: '10px 12px', borderRadius: 8, border: 'none', cursor: 'pointer',
+              background: active ? 'var(--surface)' : 'transparent',
+              color: active ? 'var(--text)' : 'var(--text-mute)',
+              fontSize: 14, fontFamily: 'inherit', fontWeight: 700,
+              textAlign: 'left', transition: 'color 0.1s, background 0.1s',
+            }}
+              onMouseEnter={e => { if (!active) { e.currentTarget.style.color = 'var(--text)'; e.currentTarget.style.background = 'var(--surface)'; } }}
+              onMouseLeave={e => { if (!active) { e.currentTarget.style.color = 'var(--text-mute)'; e.currentTarget.style.background = 'transparent'; } }}
+            >
+              <Icon name={item.icon} size={20} color="currentColor" />
+              {item.label}
+            </button>
+          );
+        })}
       </nav>
 
       {playlists.length > 0 && (
-        <div style={{ margin: "24px 12px 0", borderTop: "1px solid #1a1a1a", paddingTop: 16 }}>
-          <p style={{ color: "#5a5a5a", fontSize: 11, fontFamily: "'DM Sans', sans-serif", fontWeight: 700, letterSpacing: 1, padding: "0 12px 12px", textTransform: "uppercase" }}>
-            Mis Playlists
-          </p>
-          {playlists.map(pl => (
-            <button key={pl.id} onClick={() => onPlayPlaylist(pl)} style={{
-              display: "flex", alignItems: "center", gap: 10, width: "100%",
-              padding: "8px 12px", border: "none", background: "transparent",
-              color: "#8a8a8a", fontSize: 13, fontFamily: "'DM Sans', sans-serif",
-              cursor: "pointer", textAlign: "left", borderRadius: 6, transition: "color 0.15s",
-            }}
-              onMouseEnter={e => e.currentTarget.style.color = "#fff"}
-              onMouseLeave={e => e.currentTarget.style.color = "#8a8a8a"}
-            >
-              <span style={{
-                width: 32, height: 32, borderRadius: 4, background: pl.color,
-                display: "flex", alignItems: "center", justifyContent: "center",
-                fontSize: 12, flexShrink: 0,
-              }}>♫</span>
-              <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{pl.name}</span>
-            </button>
-          ))}
+        <div style={{ margin: '20px 10px 0', borderTop: '1px solid var(--line)', paddingTop: 16, flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+          <p style={{ color: 'var(--text-dim)', fontSize: 11, fontWeight: 700, letterSpacing: 1, padding: '0 12px 10px', textTransform: 'uppercase' }}>Mis Playlists</p>
+          <div style={{ overflowY: 'auto', flex: 1 }}>
+            {playlists.map((pl, i) => (
+              <button key={pl.id} onClick={() => onPlayPlaylist(pl)} style={{
+                display: 'flex', alignItems: 'center', gap: 10, width: '100%',
+                padding: '7px 12px', border: 'none', background: 'transparent',
+                color: 'var(--text-mute)', fontSize: 13, fontFamily: 'inherit',
+                cursor: 'pointer', textAlign: 'left', borderRadius: 6, transition: 'color 0.1s',
+              }}
+                onMouseEnter={e => { e.currentTarget.style.color = 'var(--text)'; e.currentTarget.style.background = 'var(--surface)'; }}
+                onMouseLeave={e => { e.currentTarget.style.color = 'var(--text-mute)'; e.currentTarget.style.background = 'transparent'; }}
+              >
+                <Cover seed={pl.id} hue={PLAYLIST_COLORS[i % PLAYLIST_COLORS.length] ? 195 : 195} size="xs" style={{ width: 32, height: 32 }} />
+                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontWeight: 600 }}>{pl.name}</span>
+              </button>
+            ))}
+          </div>
         </div>
       )}
     </div>
