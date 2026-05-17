@@ -45,7 +45,7 @@ function AppLayout() {
   // Playback
   const [currentTrack, setCurrentTrack] = useState(null);
   const [queue, setQueue] = useLocalStorage('gerify_queue', []);
-  const [history, setHistory] = useState([]);
+  const [history, setHistory] = useLocalStorage('gerify_history', []);
   const [isPlaying, setIsPlaying] = useState(false);
 
   // Player state (lifted from Player.jsx)
@@ -331,7 +331,7 @@ function AppLayout() {
 
         {/* Full-screen expanded player */}
         {expanded && currentTrack && (
-          <ExpandedPlayer {...playerProps} history={history} />
+          <ExpandedPlayer {...playerProps} queue={queue} history={history} />
         )}
       </div>
     </>
