@@ -2,6 +2,7 @@ import { useState } from 'react';
 import Icon from './Icon';
 import Cover from './Cover';
 import { formatTime } from '../utils/format';
+import { useIsMobile } from '../hooks/useIsMobile';
 
 export default function ExpandedPlayer({
   currentTrack, isPlaying, setIsPlaying,
@@ -14,7 +15,8 @@ export default function ExpandedPlayer({
   onCollapse,
   queue, history,
 }) {
-  const [tab, setTab] = useState('queue'); // 'queue' | 'history'
+  const [tab, setTab] = useState('queue');
+  const isMobile = useIsMobile();
   const pct = duration > 0 ? (progress / duration) * 100 : 0;
   const isLiked = currentTrack ? liked.has(currentTrack.id?.videoId) : false;
   const cycleRepeat = () => setRepeat(r => r === 'off' ? 'all' : r === 'all' ? 'one' : 'off');
@@ -105,8 +107,8 @@ export default function ExpandedPlayer({
         </div>
       </div>
 
-      {/* Right panel: queue / history */}
-      <div style={{ width: 380, background: 'var(--bg-2)', borderLeft: '1px solid var(--line)', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+      {/* Right panel: queue / history — desktop only */}
+      {!isMobile && <div style={{ width: 380, background: 'var(--bg-2)', borderLeft: '1px solid var(--line)', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
         {/* Tabs */}
         <div style={{ display: 'flex', borderBottom: '1px solid var(--line)', flexShrink: 0 }}>
           {[['queue', 'Cola'], ['history', 'Historial']].map(([key, label]) => (
@@ -136,7 +138,7 @@ export default function ExpandedPlayer({
               ))
           )}
         </div>
-      </div>
+      </div>}
     </div>
   );
 }
