@@ -51,7 +51,7 @@ const TABS = [
 export default function LibraryView({
   queue, currentTrack, onPlayTrack, onRemoveFromQueue,
   playlists, onCreatePlaylist, onDeletePlaylist, onAddTrackToPlaylist, onRemoveTrackFromPlaylist,
-  liked, onToggleLike, history,
+  liked, onToggleLike, history, onPlayPlaylist,
   bottomPad,
 }) {
   const isMobile = useIsMobile();
@@ -121,7 +121,7 @@ export default function LibraryView({
                     <div style={{ color: 'var(--text-mute)', fontSize: 12, marginTop: 2 }}>{pl.tracks.length} canciones</div>
                   </div>
                   {pl.tracks.length > 0 && (
-                    <button onClick={e => { e.stopPropagation(); onPlayTrack(pl.tracks[0]); }} style={{ background: 'var(--green)', border: 'none', borderRadius: 20, padding: '8px 14px', color: '#0a0a0a', fontWeight: 800, cursor: 'pointer', fontSize: 12, minHeight: 40, flexShrink: 0 }}>▶</button>
+                    <button onClick={e => { e.stopPropagation(); onPlayPlaylist ? onPlayPlaylist(pl) : onPlayTrack(pl.tracks[0]); }} style={{ background: 'var(--green)', border: 'none', borderRadius: 20, padding: '8px 14px', color: '#0a0a0a', fontWeight: 800, cursor: 'pointer', fontSize: 12, minHeight: 40, flexShrink: 0 }}>▶</button>
                   )}
                   <span style={{ color: 'var(--text-dim)', fontSize: 14, flexShrink: 0 }}>{expanded === pl.id ? '▴' : '▾'}</span>
                 </div>

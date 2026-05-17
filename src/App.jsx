@@ -161,6 +161,14 @@ function AppLayout() {
     setQueue(q => q.filter((_, i) => i !== index));
   }, [setQueue]);
 
+  // Plays first track and puts the rest at the FRONT of the queue (before existing queue items)
+  const playPlaylist = useCallback((pl) => {
+    if (!pl.tracks?.length) return;
+    const [first, ...rest] = pl.tracks;
+    playTrack(first);
+    if (rest.length) setQueue(q => [...rest, ...q]);
+  }, [playTrack, setQueue]);
+
   const createPlaylist = useCallback((name) => {
     const color = PLAYLIST_COLORS[Math.floor(Math.random() * PLAYLIST_COLORS.length)];
     const newPl = { id: Date.now().toString(), name, color, tracks: [] };
@@ -214,7 +222,7 @@ function AppLayout() {
   const viewProps = {
     playlists, onCreatePlaylist: createPlaylist, onDeletePlaylist: deletePlaylist,
     onAddTrackToPlaylist: addTrackToPlaylist, onRemoveTrackFromPlaylist: removeTrackFromPlaylist,
-    onPlayTrack: playTrack, setQueue, liked, likedIds, onToggleLike: toggleLike,
+    onPlayTrack: playTrack, onPlayPlaylist: playPlaylist, setQueue, liked, likedIds, onToggleLike: toggleLike,
     queue, currentTrack, onRemoveFromQueue: removeFromQueue, history,
   };
 
@@ -222,7 +230,7 @@ function AppLayout() {
     <Routes>
       <Route path="/" element={
         <HomeView {...viewProps}
-          onPlayPlaylist={(pl) => { if (pl.tracks?.length) playTrack(pl.tracks[0]); else navigate('/search'); }}
+          onPlayPlaylist={(pl) => pl.tracks?.length ? playPlaylist(pl) : navigate('/search')}
           bottomPad={isMobile ? mobilePad : undefined}
         />
       } />
@@ -256,7 +264,7 @@ function AppLayout() {
         ) : (
           <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
             <Sidebar playlists={playlists} pathname={pathname} navigate={navigate}
-              onPlayPlaylist={(pl) => { if (pl.tracks?.length) { playTrack(pl.tracks[0]); navigate('/library'); } }}
+              onPlayPlaylist={(pl) => { if (pl.tracks?.length) { playPlaylist(pl); navigate('/library'); } }}
             />
             <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
               <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>

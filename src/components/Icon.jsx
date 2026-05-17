@@ -57,9 +57,10 @@ export default function Icon({ name, size = 20, stroke = 1.6, color = 'currentCo
       return <svg style={s} viewBox="0 0 24 24"><rect {...p} x="2" y="4" width="14" height="10" rx="2"/><path {...p} d="M8 18h8a2 2 0 002-2V9"/><line {...p} x1="6" y1="21" x2="10" y2="21"/><line {...p} x1="8" y1="18" x2="8" y2="21"/></svg>;
     case 'logo':
       return (
-        <svg style={s} viewBox="0 0 24 24">
-          <circle fill="oklch(0.78 0.17 155)" stroke="none" cx="12" cy="12" r="11"/>
-          <path fill="none" stroke="#0a0a0a" strokeWidth="2.2" strokeLinecap="round" d="M7 16V8l5 3 5-3v8"/>
+        <svg style={s} viewBox="0 0 32 32">
+          <rect width="32" height="32" rx="9" fill="oklch(0.78 0.17 155)"/>
+          {/* G letterform */}
+          <path fill="#0a1a12" d="M16 7C11.03 7 7 11.03 7 16s4.03 9 9 9c4.42 0 8.1-3.2 8.87-7.4H15.5v2.8h6.1C20.7 22.7 18.5 24.2 16 24.2c-4.53 0-8.2-3.67-8.2-8.2s3.67-8.2 8.2-8.2c2.27 0 4.32.92 5.81 2.4l2-2A11.1 11.1 0 0016 7z"/>
         </svg>
       );
     default:
