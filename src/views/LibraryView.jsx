@@ -17,7 +17,7 @@ function PlaylistDetail({ pl, onPlayTrack, onRemoveTrack, onDelete }) {
           <TrackRow key={i} track={track}
             actions={
               <>
-                <button onClick={() => onPlayTrack(track)} style={{ background: 'var(--green)', border: 'none', borderRadius: 20, padding: '7px 13px', color: '#0a0a0a', fontWeight: 800, cursor: 'pointer', fontSize: 12, minHeight: 40 }}>▶</button>
+                <button onClick={() => onPlayTrack(track, pl.tracks, pl.name)} style={{ background: 'var(--green)', border: 'none', borderRadius: 20, padding: '7px 13px', color: '#0a0a0a', fontWeight: 800, cursor: 'pointer', fontSize: 12, minHeight: 40 }}>▶</button>
                 <button onClick={() => onRemoveTrack(i)} style={{ background: 'transparent', border: '1px solid var(--surface-3)', borderRadius: 20, padding: '7px 10px', color: 'var(--text-mute)', cursor: 'pointer', fontSize: 12, minHeight: 40 }}>✕</button>
               </>
             }
@@ -150,7 +150,7 @@ export default function LibraryView({
               <TrackRow key={i} track={track}
                 actions={
                   <>
-                    <button onClick={() => onPlayTrack(track)} style={{ background: 'var(--green)', border: 'none', borderRadius: 20, padding: '7px 13px', color: '#0a0a0a', fontWeight: 800, cursor: 'pointer', fontSize: 12, minHeight: 40 }}>▶</button>
+                    <button onClick={() => onPlayTrack(track, liked, 'Favoritos')} style={{ background: 'var(--green)', border: 'none', borderRadius: 20, padding: '7px 13px', color: '#0a0a0a', fontWeight: 800, cursor: 'pointer', fontSize: 12, minHeight: 40 }}>▶</button>
                     <button onClick={() => onToggleLike?.(track)} style={{ background: 'transparent', border: 'none', color: 'var(--green)', cursor: 'pointer', padding: '7px 10px', display: 'flex', alignItems: 'center', minHeight: 40 }}>
                       <Icon name="heart-fill" size={18} color="var(--green)" />
                     </button>

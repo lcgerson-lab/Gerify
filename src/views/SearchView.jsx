@@ -53,7 +53,7 @@ function SaveMenu({ track, playlists, onAddTrackToPlaylist, onCreatePlaylist, on
   );
 }
 
-export default function SearchView({ onPlayTrack, setQueue, playlists, onAddTrackToPlaylist, onCreatePlaylist, likedIds, onToggleLike, bottomPad }) {
+export default function SearchView({ onPlayTrack, onAddToQueue, playlists, onAddTrackToPlaylist, onCreatePlaylist, likedIds, onToggleLike, bottomPad }) {
   const isMobile = useIsMobile();
   const [searchParams] = useSearchParams();
   const [query, setQuery] = useState('');
@@ -194,14 +194,14 @@ export default function SearchView({ onPlayTrack, setQueue, playlists, onAddTrac
                 >
                   {!isMobile && <span style={{ color: 'var(--text-dim)', width: 20, textAlign: 'center', fontSize: 12, fontWeight: 600 }}>{i + 1}</span>}
                   <Cover item={item} size="xs" style={{ cursor: 'pointer' }} />
-                  <div style={{ flex: 1, minWidth: 0, cursor: 'pointer' }} onClick={() => onPlayTrack(item)}>
+                  <div style={{ flex: 1, minWidth: 0, cursor: 'pointer' }} onClick={() => onPlayTrack(item, results, `Búsqueda: ${query}`)}>
                     <div style={{ fontSize: isMobile ? 13 : 14, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.snippet.title}</div>
                     <div style={{ color: 'var(--text-mute)', fontSize: 12, marginTop: 2 }}>{item.snippet.channelTitle}</div>
                   </div>
                   <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
-                    <button onClick={() => onPlayTrack(item)} style={{ background: 'var(--green)', border: 'none', borderRadius: 20, padding: '8px 14px', color: '#0a0a0a', fontWeight: 800, cursor: 'pointer', fontSize: 12, minHeight: 40 }}>▶</button>
+                    <button onClick={() => onPlayTrack(item, results, `Búsqueda: ${query}`)} style={{ background: 'var(--green)', border: 'none', borderRadius: 20, padding: '8px 14px', color: '#0a0a0a', fontWeight: 800, cursor: 'pointer', fontSize: 12, minHeight: 40 }}>▶</button>
                     {!isMobile && (
-                      <button onClick={() => setQueue(q => [...q, item])} style={{ background: 'transparent', border: '1px solid var(--surface-3)', borderRadius: 20, padding: '6px 12px', color: 'var(--text-mute)', cursor: 'pointer', fontSize: 12, fontFamily: 'inherit' }}
+                      <button onClick={() => onAddToQueue(item)} style={{ background: 'transparent', border: '1px solid var(--surface-3)', borderRadius: 20, padding: '6px 12px', color: 'var(--text-mute)', cursor: 'pointer', fontSize: 12, fontFamily: 'inherit' }}
                         onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--text)'; e.currentTarget.style.color = 'var(--text)'; }}
                         onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--surface-3)'; e.currentTarget.style.color = 'var(--text-mute)'; }}
                       >+ Cola</button>
@@ -215,7 +215,7 @@ export default function SearchView({ onPlayTrack, setQueue, playlists, onAddTrac
                       )}
                     </div>
                     {isMobile && (
-                      <button onClick={() => setQueue(q => [...q, item])} style={{ background: 'transparent', border: '1px solid var(--surface-3)', borderRadius: 20, padding: '8px 12px', color: 'var(--text-mute)', cursor: 'pointer', fontSize: 12, minHeight: 40 }}>+</button>
+                      <button onClick={() => onAddToQueue(item)} style={{ background: 'transparent', border: '1px solid var(--surface-3)', borderRadius: 20, padding: '8px 12px', color: 'var(--text-mute)', cursor: 'pointer', fontSize: 12, minHeight: 40 }}>+</button>
                     )}
                   </div>
                 </div>

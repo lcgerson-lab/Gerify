@@ -1,8 +1,14 @@
 import { useEffect, useRef } from 'react';
 
-export default function YouTubePlayer({ videoId, isPlaying, setIsPlaying, onEnded, playerRef }) {
+export default function YouTubePlayer({ videoId, isPlaying, setIsPlaying, onEnded, playerRef, volume = 80 }) {
   const containerRef = useRef(null);
   const ytPlayerRef = useRef(null);
+  // Keep the latest onEnded in a ref: the YT event closure is created once, so
+  // referencing the prop directly would call a stale version.
+  const onEndedRef = useRef(onEnded);
+  onEndedRef.current = onEnded;
+  const volumeRef = useRef(volume);
+  volumeRef.current = volume;
 
   useEffect(() => {
     if (!videoId) return;
@@ -15,18 +21,18 @@ export default function YouTubePlayer({ videoId, isPlaying, setIsPlaying, onEnde
       ytPlayerRef.current = new window.YT.Player(containerRef.current, {
         height: "1", width: "1",
         videoId,
-        playerVars: { autoplay: 1, controls: 0, rel: 0, modestbranding: 1 },
+        playerVars: { autoplay: 1, controls: 0, rel: 0, modestbranding: 1, playsinline: 1 },
         events: {
           onReady: (e) => {
             playerRef.current = e.target;
-            e.target.setVolume(80);
+            e.target.setVolume(volumeRef.current);
           },
           onStateChange: (e) => {
             if (e.data === window.YT.PlayerState.PLAYING) setIsPlaying(true);
             if (e.data === window.YT.PlayerState.PAUSED) setIsPlaying(false);
             if (e.data === window.YT.PlayerState.ENDED) {
               setIsPlaying(false);
-              onEnded?.();
+              onEndedRef.current?.();
             }
           },
         },

@@ -11,7 +11,40 @@ import SearchView from './views/SearchView';
 import LibraryView from './views/LibraryView';
 import { useLocalStorage } from './hooks/useLocalStorage';
 import { useIsMobile } from './hooks/useIsMobile';
-import { PLAYLIST_COLORS } from './constants';
+import { PLAYLIST_COLORS, YT_API_KEY } from './constants';
+
+const vid = (t) => t?.id?.videoId;
+
+function shuffleArray(a) {
+  const s = [...a];
+  for (let i = s.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [s[i], s[j]] = [s[j], s[i]];
+  }
+  return s;
+}
+
+// Spotify-style "smart shuffle": avoids two songs from the same artist back to back
+function smartShuffle(tracks) {
+  const byArtist = {};
+  for (const t of shuffleArray(tracks)) {
+    const a = t.snippet?.channelTitle || '?';
+    (byArtist[a] = byArtist[a] || []).push(t);
+  }
+  let groups = Object.values(byArtist);
+  const result = [];
+  let last = null;
+  while (result.length < tracks.length) {
+    groups = groups.filter(g => g.length > 0);
+    if (!groups.length) break;
+    groups.sort((a, b) => b.length - a.length);
+    const pick = groups.find(g => g[0].snippet?.channelTitle !== last) || groups[0];
+    const t = pick.shift();
+    result.push(t);
+    last = t.snippet?.channelTitle;
+  }
+  return result;
+}
 
 const CSS_VARS = `
   :root {
@@ -44,7 +77,11 @@ function AppLayout() {
 
   // Playback
   const [currentTrack, setCurrentTrack] = useState(null);
-  const [queue, setQueue] = useLocalStorage('gerify_queue', []);
+  // Two-tier queue (Spotify model): manual queue (highest priority) + context queue (current source)
+  const [manualQueue, setManualQueue] = useLocalStorage('gerify_manual_queue', []);
+  const [contextQueue, setContextQueue] = useLocalStorage('gerify_context_queue', []);
+  const [contextOriginal, setContextOriginal] = useLocalStorage('gerify_context_original', []);
+  const [contextLabel, setContextLabel] = useLocalStorage('gerify_context_label', '');
   const [history, setHistory] = useLocalStorage('gerify_history', []);
   const [isPlaying, setIsPlaying] = useState(false);
 
@@ -55,6 +92,7 @@ function AppLayout() {
   const [muted, setMuted] = useState(false);
   const [shuffle, setShuffle] = useState(false);
   const [repeat, setRepeat] = useState('off'); // 'off' | 'all' | 'one'
+  const [autoplay] = useLocalStorage('gerify_autoplay', true);
 
   // UI state
   const [expanded, setExpanded] = useState(false);
@@ -63,9 +101,16 @@ function AppLayout() {
   // Library
   const [playlists, setPlaylists] = useLocalStorage('gerify_playlists', []);
   const [liked, setLiked] = useLocalStorage('gerify_liked', []);
-  const likedIds = useMemo(() => new Set(liked.map(i => i.id?.videoId).filter(Boolean)), [liked]);
+  const likedIds = useMemo(() => new Set(liked.map(vid).filter(Boolean)), [liked]);
 
-  // Progress polling
+  // Combined queue for display (manual first, then current source)
+  const queue = useMemo(() => [...manualQueue, ...contextQueue], [manualQueue, contextQueue]);
+
+  // Latest state mirror so stable callbacks (and the YT onEnded closure) never go stale
+  const stateRef = useRef({});
+  stateRef.current = { manualQueue, contextQueue, contextOriginal, history, currentTrack, shuffle, repeat, autoplay, progress, volume, muted };
+
+  // Progress polling + MediaSession position
   useEffect(() => {
     if (!isPlaying) return;
     const id = setInterval(() => {
@@ -74,6 +119,9 @@ function AppLayout() {
         const dur = playerRef.current.getDuration();
         if (!isNaN(cur) && cur >= 0) setProgress(cur);
         if (!isNaN(dur) && dur > 0) setDuration(dur);
+        if ('mediaSession' in navigator && dur > 0) {
+          try { navigator.mediaSession.setPositionState({ duration: dur, position: Math.min(cur, dur) }); } catch {}
+        }
       }
     }, 500);
     return () => clearInterval(id);
@@ -84,90 +132,190 @@ function AppLayout() {
     if (playerRef.current?.setVolume) playerRef.current.setVolume(muted ? 0 : volume);
   }, [volume, muted]);
 
-  const toggleLike = useCallback((track) => {
-    const vid = track?.id?.videoId;
-    if (!vid) return;
-    setLiked(l =>
-      l.some(t => t.id?.videoId === vid) ? l.filter(t => t.id?.videoId !== vid) : [...l, track]
-    );
-  }, [setLiked]);
-
-  const playTrack = useCallback((track) => {
+  const advanceTo = useCallback((track) => {
     setCurrentTrack(prev => {
-      if (prev) setHistory(h => [prev, ...h.slice(0, 49)]);
+      if (prev && vid(prev) !== vid(track)) setHistory(h => [prev, ...h.slice(0, 49)]);
       return track;
     });
     setIsPlaying(true);
     setProgress(0);
     setDuration(0);
-    setQueue(q => q.filter(t => t.id.videoId !== track.id.videoId));
-  }, [setQueue]);
+  }, [setHistory]);
 
-  const handleNext = useCallback(() => {
-    setQueue(q => {
-      if (q.length === 0) {
-        if (repeat === 'all' || repeat === 'one') {
-          setIsPlaying(true);
-          if (playerRef.current?.seekTo) playerRef.current.seekTo(0);
-        } else {
-          setIsPlaying(false);
-        }
-        return q;
+  // Autoplay: fetch related tracks (same artist) when both queues are exhausted
+  const fetchRelated = useCallback(async (seed) => {
+    try {
+      const q = seed.snippet?.channelTitle || seed.snippet?.title;
+      const res = await fetch(`https://www.googleapis.com/youtube/v3/search?part=snippet&q=${encodeURIComponent(q)}&type=video&videoCategoryId=10&maxResults=25&key=${YT_API_KEY}`);
+      const data = await res.json();
+      if (data.error || !data.items) return [];
+      const s = stateRef.current;
+      const seen = new Set([vid(seed), vid(s.currentTrack), ...s.history.map(vid)].filter(Boolean));
+      return data.items.filter(it => it.id?.videoId && !seen.has(it.id.videoId)).slice(0, 20);
+    } catch {
+      return [];
+    }
+  }, []);
+
+  // Single source of truth for "play next track". Stable (reads stateRef), so the
+  // YouTube onEnded closure stays correct even though it is captured once.
+  const handleNext = useCallback(async () => {
+    const s = stateRef.current;
+    // 1. Manual queue (highest priority)
+    if (s.manualQueue.length) {
+      const [next, ...rest] = s.manualQueue;
+      setManualQueue(rest);
+      advanceTo(next);
+      return;
+    }
+    // 2. Current source (playlist / album / search)
+    if (s.contextQueue.length) {
+      const [next, ...rest] = s.contextQueue;
+      setContextQueue(rest);
+      advanceTo(next);
+      return;
+    }
+    // 3. Repeat all → restart the source
+    if (s.repeat === 'all' && s.contextOriginal.length) {
+      const seq = s.shuffle ? smartShuffle(s.contextOriginal) : s.contextOriginal;
+      const [next, ...rest] = seq;
+      setContextQueue(rest);
+      advanceTo(next);
+      return;
+    }
+    // 4. Autoplay recommendations
+    if (s.autoplay && s.currentTrack) {
+      const related = await fetchRelated(s.currentTrack);
+      if (related.length) {
+        const [next, ...rest] = related;
+        setContextOriginal(related);
+        setContextLabel('Autoplay');
+        setContextQueue(rest);
+        advanceTo(next);
+        return;
       }
-      const [next, ...rest] = shuffle
-        ? (() => { const s = [...q]; const ri = Math.floor(Math.random() * s.length); const [n] = s.splice(ri, 1); return [n, ...s]; })()
-        : q;
-      setCurrentTrack(prev => {
-        if (prev) setHistory(h => [prev, ...h.slice(0, 49)]);
-        return next;
-      });
-      setIsPlaying(true);
-      setProgress(0);
-      setDuration(0);
-      return rest;
-    });
-  }, [setQueue, shuffle, repeat]);
+    }
+    // 5. Nothing left
+    setIsPlaying(false);
+  }, [advanceTo, fetchRelated, setManualQueue, setContextQueue, setContextOriginal, setContextLabel]);
 
   const handlePrev = useCallback(() => {
-    if (progress > 3 && playerRef.current?.seekTo) {
+    if (stateRef.current.progress > 3 && playerRef.current?.seekTo) {
       playerRef.current.seekTo(0);
       setProgress(0);
       return;
     }
-    setHistory(h => {
-      if (h.length === 0) return h;
-      const [prev, ...rest] = h;
-      setCurrentTrack(cur => {
-        if (cur) setQueue(q => [cur, ...q]);
-        return prev;
-      });
-      setIsPlaying(true);
+    const h = stateRef.current.history;
+    if (!h.length) {
+      if (playerRef.current?.seekTo) playerRef.current.seekTo(0);
       setProgress(0);
-      setDuration(0);
-      return rest;
+      return;
+    }
+    const [prev, ...rest] = h;
+    setHistory(rest);
+    setCurrentTrack(cur => {
+      if (cur) setContextQueue(q => [cur, ...q]);
+      return prev;
     });
-  }, [setQueue, progress]);
+    setIsPlaying(true);
+    setProgress(0);
+    setDuration(0);
+  }, [setHistory, setContextQueue]);
 
   const handleEnded = useCallback(() => {
-    if (repeat === 'one') {
+    if (stateRef.current.repeat === 'one') {
       if (playerRef.current?.seekTo) playerRef.current.seekTo(0);
       setIsPlaying(true);
     } else {
       handleNext();
     }
-  }, [handleNext, repeat]);
+  }, [handleNext]);
 
-  const removeFromQueue = useCallback((index) => {
-    setQueue(q => q.filter((_, i) => i !== index));
-  }, [setQueue]);
+  const toggleLike = useCallback((track) => {
+    const id = vid(track);
+    if (!id) return;
+    setLiked(l => l.some(t => vid(t) === id) ? l.filter(t => vid(t) !== id) : [...l, track]);
+  }, [setLiked]);
 
-  // Plays first track and puts the rest at the FRONT of the queue (before existing queue items)
+  // Play a single track. Optionally set a playback context (the list it belongs to)
+  // so playback continues through that list afterwards.
+  const playTrack = useCallback((track, contextList, label) => {
+    advanceTo(track);
+    setManualQueue(q => q.filter(t => vid(t) !== vid(track)));
+    if (Array.isArray(contextList) && contextList.length) {
+      const idx = contextList.findIndex(t => vid(t) === vid(track));
+      let rest = idx >= 0 ? contextList.slice(idx + 1) : contextList;
+      if (stateRef.current.shuffle) rest = smartShuffle(rest);
+      setContextQueue(rest);
+      setContextOriginal(contextList);
+      setContextLabel(label || '');
+    } else {
+      setContextQueue(q => q.filter(t => vid(t) !== vid(track)));
+    }
+  }, [advanceTo, setManualQueue, setContextQueue, setContextOriginal, setContextLabel]);
+
+  // Play a whole playlist/album: first track now, the rest become the context source.
   const playPlaylist = useCallback((pl) => {
     if (!pl.tracks?.length) return;
-    const [first, ...rest] = pl.tracks;
-    playTrack(first);
-    if (rest.length) setQueue(q => [...rest, ...q]);
-  }, [playTrack, setQueue]);
+    const ordered = stateRef.current.shuffle ? smartShuffle(pl.tracks) : pl.tracks;
+    const [first, ...rest] = ordered;
+    advanceTo(first);
+    setManualQueue(q => q.filter(t => vid(t) !== vid(first)));
+    setContextQueue(rest);
+    setContextOriginal(pl.tracks);
+    setContextLabel(pl.name || 'Playlist');
+  }, [advanceTo, setManualQueue, setContextQueue, setContextOriginal, setContextLabel]);
+
+  // "Add to queue" → manual queue (plays before the rest of the source)
+  const addToQueue = useCallback((track) => {
+    setManualQueue(q => q.some(t => vid(t) === vid(track)) ? q : [...q, track]);
+  }, [setManualQueue]);
+
+  // Remove from the combined queue (maps index back to manual vs context)
+  const removeFromQueue = useCallback((index) => {
+    const ml = stateRef.current.manualQueue.length;
+    if (index < ml) setManualQueue(q => q.filter((_, i) => i !== index));
+    else setContextQueue(q => q.filter((_, i) => i !== index - ml));
+  }, [setManualQueue, setContextQueue]);
+
+  // Shuffle toggle: reorders the remaining source (Spotify generates a sequence)
+  const toggleShuffle = useCallback(() => {
+    const s = stateRef.current;
+    const on = !s.shuffle;
+    setShuffle(on);
+    if (on) {
+      setContextQueue(q => smartShuffle(q));
+    } else {
+      const played = new Set([vid(s.currentTrack), ...s.history.map(vid)].filter(Boolean));
+      setContextQueue(s.contextOriginal.filter(t => !played.has(vid(t))));
+    }
+  }, [setShuffle, setContextQueue]);
+
+  // MediaSession: lock-screen / notification controls + metadata
+  useEffect(() => {
+    if (!('mediaSession' in navigator) || !currentTrack) return;
+    const thumb = currentTrack.snippet?.thumbnails || {};
+    const art = thumb.high?.url || thumb.medium?.url || thumb.default?.url;
+    try {
+      navigator.mediaSession.metadata = new window.MediaMetadata({
+        title: currentTrack.snippet?.title || '',
+        artist: currentTrack.snippet?.channelTitle || '',
+        album: 'Gerify',
+        artwork: art ? [{ src: art, sizes: '512x512', type: 'image/jpeg' }] : [],
+      });
+      navigator.mediaSession.setActionHandler('play', () => setIsPlaying(true));
+      navigator.mediaSession.setActionHandler('pause', () => setIsPlaying(false));
+      navigator.mediaSession.setActionHandler('nexttrack', () => handleNext());
+      navigator.mediaSession.setActionHandler('previoustrack', () => handlePrev());
+      navigator.mediaSession.setActionHandler('seekto', (e) => {
+        if (e.seekTime != null && playerRef.current?.seekTo) { playerRef.current.seekTo(e.seekTime); setProgress(e.seekTime); }
+      });
+    } catch {}
+  }, [currentTrack, handleNext, handlePrev]);
+
+  useEffect(() => {
+    if ('mediaSession' in navigator) navigator.mediaSession.playbackState = isPlaying ? 'playing' : 'paused';
+  }, [isPlaying]);
 
   const createPlaylist = useCallback((name) => {
     const color = PLAYLIST_COLORS[Math.floor(Math.random() * PLAYLIST_COLORS.length)];
@@ -204,7 +352,7 @@ function AppLayout() {
     currentTrack, isPlaying, setIsPlaying,
     progress, duration, seek,
     volume, setVolume, muted, setMuted,
-    shuffle, setShuffle, repeat, setRepeat,
+    shuffle, setShuffle: toggleShuffle, repeat, setRepeat,
     liked: likedIds, onToggleLike: toggleLike,
     onNext: handleNext, onPrev: handlePrev,
     playlists, onAddTrackToPlaylist: addTrackToPlaylist, onCreatePlaylist: createPlaylist,
@@ -222,8 +370,8 @@ function AppLayout() {
   const viewProps = {
     playlists, onCreatePlaylist: createPlaylist, onDeletePlaylist: deletePlaylist,
     onAddTrackToPlaylist: addTrackToPlaylist, onRemoveTrackFromPlaylist: removeTrackFromPlaylist,
-    onPlayTrack: playTrack, onPlayPlaylist: playPlaylist, setQueue, liked, likedIds, onToggleLike: toggleLike,
-    queue, currentTrack, onRemoveFromQueue: removeFromQueue, history,
+    onPlayTrack: playTrack, onPlayPlaylist: playPlaylist, onAddToQueue: addToQueue, liked, likedIds, onToggleLike: toggleLike,
+    queue, currentTrack, onRemoveFromQueue: removeFromQueue, history, contextLabel,
   };
 
   const contentRoutes = (
@@ -272,7 +420,10 @@ function AppLayout() {
                 {showQueue && (
                   <div style={{ width: 340, background: 'var(--bg-2)', borderLeft: '1px solid var(--line)', overflow: 'hidden', display: 'flex', flexDirection: 'column', flexShrink: 0 }}>
                     <div style={{ padding: '20px 20px 12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--line)', flexShrink: 0 }}>
-                      <span style={{ fontFamily: "'Syne', sans-serif", fontWeight: 800, fontSize: 16 }}>Cola</span>
+                      <div>
+                        <span style={{ fontFamily: "'Syne', sans-serif", fontWeight: 800, fontSize: 16 }}>Cola</span>
+                        {contextLabel && <div style={{ fontSize: 11, color: 'var(--text-mute)', marginTop: 2 }}>Fuente: {contextLabel}</div>}
+                      </div>
                       <button onClick={() => setShowQueue(false)} style={{ background: 'none', border: 'none', color: 'var(--text-mute)', cursor: 'pointer', fontSize: 18, padding: 4 }}>✕</button>
                     </div>
                     <div style={{ flex: 1, overflowY: 'auto', padding: '12px 12px' }}>
@@ -334,6 +485,7 @@ function AppLayout() {
             setIsPlaying={setIsPlaying}
             onEnded={handleEnded}
             playerRef={playerRef}
+            volume={muted ? 0 : volume}
           />
         )}
 
