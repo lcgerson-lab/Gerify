@@ -10,6 +10,7 @@ import HomeView from './views/HomeView';
 import SearchView from './views/SearchView';
 import LibraryView from './views/LibraryView';
 import { useLocalStorage } from './hooks/useLocalStorage';
+import { useIndexedDB } from './hooks/useIndexedDB';
 import { useIsMobile } from './hooks/useIsMobile';
 import { PLAYLIST_COLORS, YT_API_KEY } from './constants';
 
@@ -99,7 +100,7 @@ function AppLayout() {
   const [showQueue, setShowQueue] = useState(false);
 
   // Library
-  const [playlists, setPlaylists] = useLocalStorage('gerify_playlists', []);
+  const [playlists, setPlaylists] = useIndexedDB('gerify_playlists', []);
   const [liked, setLiked] = useLocalStorage('gerify_liked', []);
   const likedIds = useMemo(() => new Set(liked.map(vid).filter(Boolean)), [liked]);
 
